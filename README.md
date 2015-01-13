@@ -58,3 +58,19 @@ or
 ```php
 $panel->setPdo($pdo);
 ```
+
+Result?
+-------
+
+![Panel](http://zemistr.github.io/notorm-tracy-panel/images/preview.png)
+
+
+Changelog
+---------
+v1.0.0 (2015-01-13)
+- initial release
+
+
+-----
+
+(c) Martin Zeman (Zemistr), 2015 (http://zemistr.eu)
