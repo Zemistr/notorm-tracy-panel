@@ -12,6 +12,12 @@ Instalation
 NotOrmTracyPanel::simpleInit($notorm, $pdo);
 ```
 
+or just
+
+```php
+NotOrmTracyPanel::simpleInit($notorm);
+```
+
 ## Basic usage
 
 ```php
