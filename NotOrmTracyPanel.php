@@ -37,10 +37,13 @@ class NotOrmTracyPanel implements IBarPanel {
 	/** @var bool|string explain queries? */
 	public $explain = true;
 
-	public static function simpleInit(\NotORM $notorm, PDO $pdo) {
+	public static function simpleInit(\NotORM $notorm, PDO $pdo = null) {
 		$self = self::getInstance();
 		$self->setNotOrm($notorm);
-		$self->setPdo($pdo);
+		
+		if ($pdo) {
+			$self->setPdo($pdo);
+		}
 
 		$notorm->debug = function ($query, $parameters) use ($self) {
 			$self->logQuery($query, $parameters);
