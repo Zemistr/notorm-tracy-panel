@@ -76,6 +76,8 @@ Changelog
 v1.0.0 (2015-01-13)
 - initial release
 
+v1.0.1 (2017-01-30)
+- Add new versions of packages
 
 -----
 
