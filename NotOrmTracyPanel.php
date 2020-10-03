@@ -1,4 +1,8 @@
 <?php
+
+declare(strict_types=1);
+
+
 use Nette\Utils\Strings;
 use Tracy\Debugger;
 use Tracy\IBarPanel;
@@ -6,287 +10,299 @@ use Yep\Reflection\ReflectionClass;
 
 class NotOrmTracyPanel implements IBarPanel
 {
-    /** @var int */
-    static public $maxQueries = 200;
 
-    /** @var int maximum SQL length */
-    static public $maxLength = 500;
+	/** @var int */
+	static public $maxQueries = 200;
 
-    /** @var int */
-    private $count = 0;
+	/** @var int maximum SQL length */
+	static public $maxLength = 500;
 
-    /** @var array */
-    private $queries = [];
+	/** @var bool */
+	public $disabled = false;
 
-    /** @var string */
-    private $platform = '';
+	/** @var bool|string explain queries? */
+	public $explain = true;
 
-    /** @var int */
-    private $total_time = 0;
+	/** @var int */
+	private $count = 0;
 
-    /** @var bool */
-    public $disabled = false;
+	/** @var mixed[][] (int => {$query, $parameters, null}) */
+	private $queries = [];
 
-    /** @var \NotORM */
-    private $notorm;
+	/** @var string */
+	private $platform = '';
 
-    /** @var PDO */
-    private $pdo;
+	/** @var int */
+	private $total_time = 0;
 
-    /** @var bool|string explain queries? */
-    public $explain = true;
+	/** @var \NotORM */
+	private $notOrm;
 
-    public static function simpleInit(\NotORM $notorm, PDO $pdo = null)
-    {
-        $self = new self();
-        $self->setNotOrm($notorm);
+	/** @var \PDO */
+	private $pdo;
 
-        if ($pdo) {
-            $self->setPdo($pdo);
-        }
 
-        $notOrmReflection = ReflectionClass::from($notorm);
-        $notOrmReflection->setPropertyValue(
-          'debug',
-          function ($query, $parameters) use ($self) {
-              $self->logQuery($query, $parameters);
-              $self->startQueryTimer($self->getIndex());
-          }
-        );
+	public static function simpleInit(\NotORM $notOrm, ?\PDO $pdo = null): void
+	{
+		$self = new self;
+		$self->setNotOrm($notOrm);
 
-        $notOrmReflection->setPropertyValue(
-          'debugTimer',
-          function () use ($self) {
-              $self->stopQueryTimer($self->getIndex());
-          }
-        );
+		if ($pdo) {
+			$self->setPdo($pdo);
+		}
 
-        $self->setPlatform($pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+		$notOrmReflection = ReflectionClass::from($notOrm);
+		$notOrmReflection->setPropertyValue(
+			'debug',
+			static function ($query, $parameters) use ($self): void {
+				$self->logQuery($query, $parameters);
+				$self->startQueryTimer($self->getIndex());
+			}
+		);
 
-        Debugger::getBar()->addPanel($self);
-    }
+		$notOrmReflection->setPropertyValue(
+			'debugTimer',
+			static function () use ($self): void {
+				$self->stopQueryTimer($self->getIndex());
+			}
+		);
 
-    public function setNotOrm(\NotORM $notorm)
-    {
-        $this->notorm = $notorm;
-    }
+		$self->setPlatform($pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
 
-    public function getNotOrm()
-    {
-        return $this->notorm;
-    }
+		Debugger::getBar()->addPanel($self);
+	}
 
-    public function setPdo(PDO $pdo)
-    {
-        $this->pdo = $pdo;
-    }
 
-    public function getPdo()
-    {
-        if (!$this->pdo && $this->notorm) {
-            $this->pdo = ReflectionClass::from($this->notorm)->getPropertyValue('connection');
-        }
+	public static function dump(string $sql): string
+	{
+		$keywords1 = 'CREATE\s+TABLE|CREATE(?:\s+UNIQUE)?\s+INDEX|SELECT|UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
+		$keywords2 = 'ALL|DISTINCT|DISTINCTROW|AS|USING|ON|AND|OR|IN|IS|NOT|NULL|LIKE|TRUE|FALSE|INTEGER|CLOB|VARCHAR|DATETIME|TIME|DATE|INT|SMALLINT|BIGINT|BOOL|BOOLEAN|DECIMAL|FLOAT|TEXT|VARCHAR|DEFAULT|AUTOINCREMENT|PRIMARY\s+KEY';
 
-        return $this->pdo;
-    }
+		// insert new lines
+		$sql = " $sql ";
+		$sql = Strings::replace($sql, "#(?<=[\\s,(])($keywords1)(?=[\\s,)])#", "\n\$1");
+		if (strpos($sql, "CREATE TABLE") !== false) {
+			$sql = Strings::replace($sql, '#,\s+#i', ", \n");
+		}
 
-    public function getPlatform()
-    {
-        return $this->platform;
-    }
+		// reduce spaces
+		$sql = Strings::replace($sql, '#[ \t]{2,}#', ' ');
 
-    public function setPlatform($platform)
-    {
-        $this->platform = $platform;
-    }
+		$sql = wordwrap($sql, 100);
+		$sql = htmlSpecialChars($sql);
+		$sql = Strings::replace($sql, "#([ \t]*\r?\n){2,}#", "\n");
+		$sql = Strings::replace($sql, "#VARCHAR\\(#", 'VARCHAR (');
 
-    public function getId()
-    {
-        return 'NotORM';
-    }
+		// syntax highlight
+		$sql = Strings::replace(
+			$sql,
+			"#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#s",
+			static function (array $matches): string {
+				if (!empty($matches[1])) { // comment
+					return '<em style="color:gray">' . $matches[1] . '</em>';
+				}
+				if (!empty($matches[2])) { // error
+					return '<strong style="color:red">' . $matches[2] . '</strong>';
+				}
+				if (!empty($matches[3])) { // most important keywords
+					return '<strong style="color:blue">' . $matches[3] . '</strong>';
+				}
+				if (!empty($matches[4])) { // other keywords
+					return '<strong style="color:green">' . $matches[4] . '</strong>';
+				}
 
-    public function getTab()
-    {
-        return '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAHpJREFUOMvVU8ENgDAIBON8dgY7yU3SHTohfoQUi7FGH3pJEwI9oBwl+j1YDRGR8AIzA+hiAIxLsoOW1R3zB9Cks1VKmaQWXz3wHWEJpBbilF3wivxKB9OdiUfDnJ6Q3RNGyWp3MraytbKqjADkrIvhPYgSDG3itz/TBsqre3ItA1W8AAAAAElFTkSuQmCC" />'
-          . ($this->count . ' ' . ($this->count === 1 ? 'query' : 'queries'))
-          . ($this->total_time ? sprintf(' / %0.3f ms', $this->total_time * 1000) : '');
-    }
+				return ''; // parse error
+			}
+		);
+		$sql = trim($sql);
 
-    /**
-     * @return string HTML code for Debugbar detail
-     */
-    public function getPanel()
-    {
-        $this->disabled = true;
+		return '<pre class="dump">' . $sql . '</pre>' . "\n";
+	}
 
-        if (!$this->count) {
-            return null;
-        }
 
-        $s = '<style>';
-        $s .= '#tracy-debug-panel-NotOrmTracyPanel table { width:100% }';
-        $s .= '#tracy-debug-panel-NotOrmTracyPanel pre.tracy-dump span { color:#c16549 }';
-        $s .= '#tracy-debug-panel-NotOrmTracyPanel .tracy-alt td.notorm-sql { background: #f5f5f5 }';
-        $s .= '#tracy-debug #tracy-debug-panel-NotOrmTracyPanel td.notorm-sql { background: #fff }';
-        $s .= '</style>';
-        $s .= '<h1>'
-          . (($this->count === 1 ? 'Query' : 'Queries') . ": $this->count")
-          . ($this->total_time ? sprintf(' / %0.3f ms', $this->total_time * 1000) : '')
-          . '</h1>';
-        $s .= '<div class="tracy-inner">';
-        $s .= '<table>';
-        $s .= '<tr><th colspan="3">Connection Platform</th></tr>';
-        $s .= '<tr><td colspan="3">' . $this->getPlatform() . '</td></tr>';
-        $s .= '<tr><th>Time&nbsp;ms</th><th>SQL&nbsp;Statement</th><th>Params</th></tr>';
+	public function getNotOrm(): \NotORM
+	{
+		return $this->notOrm;
+	}
 
-        if ($this->queries) {
-            foreach ($this->queries as list($sql, $params, $time)) {
-                $explain = null;
-                if ($this->explain && preg_match('#\s*\(?\s*SELECT\s#iA', $sql) && ($connection = $this->getPdo())) {
-                    try {
-                        $cmd = is_string($this->explain) ? $this->explain : 'EXPLAIN';
-                        $sth = $connection->prepare("$cmd $sql");
-                        $sth->execute($params);
-                        $explain = $sth->fetchAll();
-                    } catch (\PDOException $e) {
-                    }
-                }
 
-                $s .= '<tr>';
-                $s .= '<td>' . ($time ? sprintf('%0.3f', $time * 1000) : '');
+	public function setNotOrm(\NotORM $notOrm): void
+	{
+		$this->notOrm = $notOrm;
+	}
 
-                static $counter;
 
-                if ($explain) {
-                    $counter++;
-                    $s .= "<br /><a class='tracy-toggle tracy-collapsed' href='#notorm-tracy-DbConnectionPanel-row-$counter'>explain</a>";
-                }
+	public function getPdo(): \PDO
+	{
+		if (!$this->pdo && $this->notOrm) {
+			$this->pdo = ReflectionClass::from($this->notOrm)->getPropertyValue('connection');
+		}
 
-                $s .= '</td>';
-                $s .= '<td class="notorm-sql">' . self::dump($sql);
+		return $this->pdo;
+	}
 
-                if ($explain) {
-                    $s .= "<table id='notorm-tracy-DbConnectionPanel-row-$counter' class='tracy-collapsed'><tr>";
-                    foreach ($explain[0] as $col => $foo) {
-                        $s .= '<th>' . htmlspecialchars($col) . '</th>';
-                    }
-                    $s .= '</tr>';
-                    foreach ($explain as $row) {
-                        $s .= '<tr>';
-                        foreach ($row as $col) {
-                            $s .= '<td>' . htmlspecialchars($col) . '</td>';
-                        }
-                        $s .= '</tr>';
-                    }
-                    $s .= '</table>';
-                }
 
-                $s .= '</td>';
-                $s .= '<td>' . Debugger::dump($params, true) . '</td>';
-                $s .= '</tr>';
-            }
-        } else {
-            $s .= '<tr><td colspan="3">No SQL logs found</td></tr>';
-        }
+	public function setPdo(\PDO $pdo): void
+	{
+		$this->pdo = $pdo;
+	}
 
-        $s .= '</table>';
 
-        if (count($this->queries) < $this->count) {
-            $s .= '<p>...and more</p>';
-        }
+	public function getPlatform(): string
+	{
+		return $this->platform;
+	}
 
-        $s .= '</div>';
 
-        return $s;
-    }
+	public function setPlatform(string $platform): void
+	{
+		$this->platform = $platform;
+	}
 
-    public function logQuery($query, $parameters)
-    {
-        if ($this->disabled) {
-            return;
-        }
 
-        $this->count++;
+	public function getId(): string
+	{
+		return 'NotORM';
+	}
 
-        if ($this->count < self::$maxQueries) {
-            $this->queries[$this->count - 1] = [$query, $parameters, null];
-        }
-    }
 
-    public function startQueryTimer($index)
-    {
-        if (isset($this->queries[$index])) {
-            Debugger::timer(__CLASS__ . ":$index");
-        }
-    }
+	public function getTab(): string
+	{
+		return '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAHpJREFUOMvVU8ENgDAIBON8dgY7yU3SHTohfoQUi7FGH3pJEwI9oBwl+j1YDRGR8AIzA+hiAIxLsoOW1R3zB9Cks1VKmaQWXz3wHWEJpBbilF3wivxKB9OdiUfDnJ6Q3RNGyWp3MraytbKqjADkrIvhPYgSDG3itz/TBsqre3ItA1W8AAAAAElFTkSuQmCC" alt="NotORM" />'
+			. ($this->count . ' ' . ($this->count === 1 ? 'query' : 'queries'))
+			. ($this->total_time ? sprintf(' / %0.3f ms', $this->total_time * 1000) : '');
+	}
 
-    public function stopQueryTimer($index)
-    {
-        if (isset($this->queries[$index])) {
-            $time = Debugger::timer(__CLASS__ . ":$index");
-            $this->total_time += $time;
-            $this->queries[$index][2] = $time;
-        }
-    }
 
-    public function getCount()
-    {
-        return $this->count;
-    }
+	/**
+	 * @return string HTML code for Debugbar detail
+	 */
+	public function getPanel(): ?string
+	{
+		$this->disabled = true;
 
-    public function getIndex()
-    {
-        return $this->count - 1;
-    }
+		if (!$this->count) {
+			return null;
+		}
 
-    public static function dump($sql)
-    {
-        $keywords1 = 'CREATE\s+TABLE|CREATE(?:\s+UNIQUE)?\s+INDEX|SELECT|UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
-        $keywords2 = 'ALL|DISTINCT|DISTINCTROW|AS|USING|ON|AND|OR|IN|IS|NOT|NULL|LIKE|TRUE|FALSE|INTEGER|CLOB|VARCHAR|DATETIME|TIME|DATE|INT|SMALLINT|BIGINT|BOOL|BOOLEAN|DECIMAL|FLOAT|TEXT|VARCHAR|DEFAULT|AUTOINCREMENT|PRIMARY\s+KEY';
+		$s = '<style>';
+		$s .= '#tracy-debug-panel-NotOrmTracyPanel table { width:100% }';
+		$s .= '#tracy-debug-panel-NotOrmTracyPanel pre.tracy-dump span { color:#c16549 }';
+		$s .= '#tracy-debug-panel-NotOrmTracyPanel .tracy-alt td.notorm-sql { background: #f5f5f5 }';
+		$s .= '#tracy-debug #tracy-debug-panel-NotOrmTracyPanel td.notorm-sql { background: #fff }';
+		$s .= '</style>';
+		$s .= '<h1>'
+			. (($this->count === 1 ? 'Query' : 'Queries') . ': ' . $this->count)
+			. ($this->total_time ? sprintf(' / %0.3f ms', $this->total_time * 1000) : '')
+			. '</h1>';
+		$s .= '<div class="tracy-inner">';
+		$s .= '<table>';
+		$s .= '<tr><th colspan="3">Connection Platform</th></tr>';
+		$s .= '<tr><td colspan="3">' . $this->getPlatform() . '</td></tr>';
+		$s .= '<tr><th>Time&nbsp;ms</th><th>SQL&nbsp;Statement</th><th>Params</th></tr>';
 
-        // insert new lines
-        $sql = " $sql ";
-        $sql = Strings::replace($sql, "#(?<=[\\s,(])($keywords1)(?=[\\s,)])#", "\n\$1");
-        if (strpos($sql, "CREATE TABLE") !== false) {
-            $sql = Strings::replace($sql, "#,\s+#i", ", \n");
-        }
+		if ($this->queries) {
+			foreach ($this->queries as [$sql, $params, $time]) {
+				$explain = null;
+				if ($this->explain && preg_match('#\s*\(?\s*SELECT\s#iA', $sql) && ($connection = $this->getPdo())) {
+					try {
+						$cmd = is_string($this->explain) ? $this->explain : 'EXPLAIN';
+						$sth = $connection->prepare($cmd . ' ' . $sql);
+						$sth->execute($params);
+						$explain = $sth->fetchAll();
+					} catch (\PDOException $e) {
+					}
+				}
 
-        // reduce spaces
-        $sql = Strings::replace($sql, '#[ \t]{2,}#', " ");
+				$s .= '<tr>';
+				$s .= '<td>' . ($time ? sprintf('%0.3f', $time * 1000) : '');
 
-        $sql = wordwrap($sql, 100);
-        $sql = htmlSpecialChars($sql);
-        $sql = Strings::replace($sql, "#([ \t]*\r?\n){2,}#", "\n");
-        $sql = Strings::replace($sql, "#VARCHAR\\(#", "VARCHAR (");
+				static $counter;
 
-        // syntax highlight
-        $sql = Strings::replace(
-          $sql,
-          "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#s",
-          function ($matches) {
-              if (!empty($matches[1])) // comment
-              {
-                  return '<em style="color:gray">' . $matches[1] . '</em>';
-              }
+				if ($explain) {
+					$counter++;
+					$s .= "<br /><a class='tracy-toggle tracy-collapsed' href='#notorm-tracy-DbConnectionPanel-row-$counter'>explain</a>";
+				}
 
-              if (!empty($matches[2])) // error
-              {
-                  return '<strong style="color:red">' . $matches[2] . '</strong>';
-              }
+				$s .= '</td>';
+				$s .= '<td class="notorm-sql">' . self::dump($sql);
 
-              if (!empty($matches[3])) // most important keywords
-              {
-                  return '<strong style="color:blue">' . $matches[3] . '</strong>';
-              }
+				if ($explain) {
+					$s .= "<table id='notorm-tracy-DbConnectionPanel-row-$counter' class='tracy-collapsed'><tr>";
+					foreach ($explain[0] as $col => $foo) {
+						$s .= '<th>' . htmlspecialchars($col) . '</th>';
+					}
+					$s .= '</tr>';
+					foreach ($explain as $row) {
+						$s .= '<tr>';
+						foreach ($row as $col) {
+							$s .= '<td>' . htmlspecialchars($col) . '</td>';
+						}
+						$s .= '</tr>';
+					}
+					$s .= '</table>';
+				}
 
-              if (!empty($matches[4])) // other keywords
-              {
-                  return '<strong style="color:green">' . $matches[4] . '</strong>';
-              }
-          }
-        );
-        $sql = trim($sql);
+				$s .= '</td>';
+				$s .= '<td>' . Debugger::dump($params, true) . '</td>';
+				$s .= '</tr>';
+			}
+		} else {
+			$s .= '<tr><td colspan="3">No SQL logs found</td></tr>';
+		}
 
-        return '<pre class="dump">' . $sql . "</pre>\n";
-    }
+		$s .= '</table>';
+
+		if (count($this->queries) < $this->count) {
+			$s .= '<p>...and more</p>';
+		}
+
+		$s .= '</div>';
+
+		return $s;
+	}
+
+
+	public function logQuery(string $query, array $parameters = []): void
+	{
+		if ($this->disabled) {
+			return;
+		}
+
+		$this->count++;
+
+		if ($this->count < self::$maxQueries) {
+			$this->queries[$this->count - 1] = [$query, $parameters, null];
+		}
+	}
+
+
+	public function startQueryTimer(int $index): void
+	{
+		if (isset($this->queries[$index])) {
+			Debugger::timer(__CLASS__ . ':' . $index);
+		}
+	}
+
+
+	public function stopQueryTimer(int $index): void
+	{
+		if (isset($this->queries[$index])) {
+			$time = Debugger::timer(__CLASS__ . ':' . $index);
+			$this->total_time += $time;
+			$this->queries[$index][2] = $time;
+		}
+	}
+
+
+	public function getCount(): int
+	{
+		return $this->count;
+	}
+
+
+	public function getIndex(): int
+	{
+		return $this->count - 1;
+	}
 }

@@ -1,28 +1,30 @@
 {
-  "name": "zemistr/notorm-tracy-panel",
-  "description": "NotORM panel for Tracy",
-  "keywords": [
-    "notorm",
-    "tracy",
-    "debug",
-    "debugging"
-  ],
-  "homepage": "http://github.com/zemistr/notorm-tracy-panel",
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Martin Zeman (Zemistr)",
-      "homepage": "http://zemistr.eu"
-    }
-  ],
-  "require": {
-    "php": ">=5.5.0",
-    "nette/utils": "^2.3",
-    "vrana/notorm": "dev-master",
-    "tracy/tracy": "^2.4",
-    "yep/reflection": "^1.0"
-  },
-  "autoload": {
-    "classmap": ["NotOrmTracyPanel.php"]
-  }
+	"name": "zemistr/notorm-tracy-panel",
+	"description": "NotORM panel for Tracy",
+	"keywords": [
+		"notorm",
+		"tracy",
+		"debug",
+		"debugging"
+	],
+	"homepage": "http://github.com/zemistr/notorm-tracy-panel",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Martin Zeman (Zemistr)",
+			"homepage": "http://zemistr.eu"
+		}
+	],
+	"require": {
+		"php": ">=5.5.0",
+		"nette/utils": "^2.3",
+		"vrana/notorm": "dev-master",
+		"tracy/tracy": "^2.4",
+		"yep/reflection": "^1.0"
+	},
+	"autoload": {
+		"classmap": [
+			"NotOrmTracyPanel.php"
+		]
+	}
 }
