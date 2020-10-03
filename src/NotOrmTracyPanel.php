@@ -32,13 +32,13 @@ class NotOrmTracyPanel implements IBarPanel
 	/** @var string */
 	private $platform = '';
 
-	/** @var int */
-	private $total_time = 0;
+	/** @var float */
+	private $totalTime = 0;
 
-	/** @var \NotORM */
+	/** @var \NotORM|null */
 	private $notOrm;
 
-	/** @var \PDO */
+	/** @var \PDO|null */
 	private $pdo;
 
 
@@ -120,7 +120,7 @@ class NotOrmTracyPanel implements IBarPanel
 	}
 
 
-	public function getNotOrm(): \NotORM
+	public function getNotOrm(): ?\NotORM
 	{
 		return $this->notOrm;
 	}
@@ -132,9 +132,9 @@ class NotOrmTracyPanel implements IBarPanel
 	}
 
 
-	public function getPdo(): \PDO
+	public function getPdo(): ?\PDO
 	{
-		if (!$this->pdo && $this->notOrm) {
+		if ($this->pdo === null && $this->notOrm !== null) {
 			$this->pdo = ReflectionClass::from($this->notOrm)->getPropertyValue('connection');
 		}
 
@@ -170,7 +170,7 @@ class NotOrmTracyPanel implements IBarPanel
 	{
 		return '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAHpJREFUOMvVU8ENgDAIBON8dgY7yU3SHTohfoQUi7FGH3pJEwI9oBwl+j1YDRGR8AIzA+hiAIxLsoOW1R3zB9Cks1VKmaQWXz3wHWEJpBbilF3wivxKB9OdiUfDnJ6Q3RNGyWp3MraytbKqjADkrIvhPYgSDG3itz/TBsqre3ItA1W8AAAAAElFTkSuQmCC" alt="NotORM" />'
 			. ($this->count . ' ' . ($this->count === 1 ? 'query' : 'queries'))
-			. ($this->total_time ? sprintf(' / %0.3f ms', $this->total_time * 1000) : '');
+			. ($this->totalTime ? sprintf(' / %0.3f ms', $this->totalTime * 1000) : '');
 	}
 
 
@@ -193,7 +193,7 @@ class NotOrmTracyPanel implements IBarPanel
 		$s .= '</style>';
 		$s .= '<h1>'
 			. (($this->count === 1 ? 'Query' : 'Queries') . ': ' . $this->count)
-			. ($this->total_time ? sprintf(' / %0.3f ms', $this->total_time * 1000) : '')
+			. ($this->totalTime ? sprintf(' / %0.3f ms', $this->totalTime * 1000) : '')
 			. '</h1>';
 		$s .= '<div class="tracy-inner">';
 		$s .= '<table>';
@@ -263,6 +263,9 @@ class NotOrmTracyPanel implements IBarPanel
 	}
 
 
+	/**
+	 * @param mixed[] $parameters
+	 */
 	public function logQuery(string $query, array $parameters = []): void
 	{
 		if ($this->disabled) {
@@ -289,7 +292,7 @@ class NotOrmTracyPanel implements IBarPanel
 	{
 		if (isset($this->queries[$index])) {
 			$time = Debugger::timer(__CLASS__ . ':' . $index);
-			$this->total_time += $time;
+			$this->totalTime += $time;
 			$this->queries[$index][2] = $time;
 		}
 	}
