@@ -12,10 +12,10 @@ class NotOrmTracyPanel implements IBarPanel
 {
 
 	/** @var int */
-	static public $maxQueries = 200;
+	public static $maxQueries = 200;
 
 	/** @var int maximum SQL length */
-	static public $maxLength = 500;
+	public static $maxLength = 500;
 
 	/** @var bool */
 	public $disabled = false;
@@ -81,7 +81,7 @@ class NotOrmTracyPanel implements IBarPanel
 		// insert new lines
 		$sql = " $sql ";
 		$sql = Strings::replace($sql, "#(?<=[\\s,(])($keywords1)(?=[\\s,)])#", "\n\$1");
-		if (strpos($sql, "CREATE TABLE") !== false) {
+		if (strpos($sql, 'CREATE TABLE') !== false) {
 			$sql = Strings::replace($sql, '#,\s+#i', ", \n");
 		}
 
@@ -89,9 +89,9 @@ class NotOrmTracyPanel implements IBarPanel
 		$sql = Strings::replace($sql, '#[ \t]{2,}#', ' ');
 
 		$sql = wordwrap($sql, 100);
-		$sql = htmlSpecialChars($sql);
+		$sql = htmlspecialchars($sql);
 		$sql = Strings::replace($sql, "#([ \t]*\r?\n){2,}#", "\n");
-		$sql = Strings::replace($sql, "#VARCHAR\\(#", 'VARCHAR (');
+		$sql = Strings::replace($sql, '#VARCHAR\\(#', 'VARCHAR (');
 
 		// syntax highlight
 		$sql = Strings::replace(
