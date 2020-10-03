@@ -120,8 +120,12 @@ class NotOrmTracyPanel implements IBarPanel
 	}
 
 
-	public function getNotOrm(): ?\NotORM
+	public function getNotOrm(): \NotORM
 	{
+		if ($this->notOrm === null) {
+			throw new \RuntimeException('NotORM does not exist. Did you call method simpleInit()?');
+		}
+
 		return $this->notOrm;
 	}
 
@@ -132,10 +136,13 @@ class NotOrmTracyPanel implements IBarPanel
 	}
 
 
-	public function getPdo(): ?\PDO
+	public function getPdo(): \PDO
 	{
 		if ($this->pdo === null && $this->notOrm !== null) {
 			$this->pdo = ReflectionClass::from($this->notOrm)->getPropertyValue('connection');
+		}
+		if ($this->pdo === null) {
+			throw new \RuntimeException('Pdo does not exist. Did you call method simpleInit()?');
 		}
 
 		return $this->pdo;
