@@ -138,11 +138,8 @@ class NotOrmTracyPanel implements IBarPanel
 
 	public function getPdo(): \PDO
 	{
-		if ($this->pdo === null && $this->notOrm !== null) {
-			$this->pdo = ReflectionClass::from($this->notOrm)->getPropertyValue('connection');
-		}
 		if ($this->pdo === null) {
-			throw new \RuntimeException('Pdo does not exist. Did you call method simpleInit()?');
+			$this->pdo = ReflectionClass::from($this->getNotOrm())->getPropertyValue('connection');
 		}
 
 		return $this->pdo;
