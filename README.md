@@ -1,4 +1,4 @@
-notorm-tracy-panel
+NotORM Tracy panel
 ==================
 
 NotORM Panel for Tracy for debugging
