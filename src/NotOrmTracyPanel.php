@@ -208,10 +208,10 @@ class NotOrmTracyPanel implements IBarPanel
 		if ($this->queries) {
 			foreach ($this->queries as [$sql, $params, $time]) {
 				$explain = null;
-				if ($this->explain && preg_match('#\s*\(?\s*SELECT\s#iA', $sql) && ($connection = $this->getPdo())) {
+				if ($this->explain && $this->pdo !== null && preg_match('#\s*\(?\s*SELECT\s#iA', $sql)) {
 					try {
 						$cmd = is_string($this->explain) ? $this->explain : 'EXPLAIN';
-						$sth = $connection->prepare($cmd . ' ' . $sql);
+						$sth = $this->pdo->prepare($cmd . ' ' . $sql);
 						$sth->execute($params);
 						$explain = $sth->fetchAll();
 					} catch (\PDOException $e) {
