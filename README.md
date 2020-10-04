@@ -25,7 +25,7 @@ $panel = NotOrmTracyPanel::getInstance(); // or new NotOrmTracyPanel()
 \Tracy\Debugger::getBar()->addPanel($panel);
 
 $notorm->debug = function($query, $parameters) {
-	NotOrmTracyPanel::getInstance()->logQuery($query, $parameters);
+    NotOrmTracyPanel::getInstance()->logQuery($query, $parameters);
 };
 ```
 	
@@ -36,13 +36,13 @@ $panel = NotOrmTracyPanel::getInstance(); // or new NotOrmTracyPanel()
 \Tracy\Debugger::getBar()->addPanel($panel);
 
 $notorm->debug = function($query, $parameters) {
-	$instance = NotOrmTracyPanel::getInstance();
-	$instance->logQuery($query, $parameters);
+    $instance = NotOrmTracyPanel::getInstance();
+    $instance->logQuery($query, $parameters);
     $instance->startQueryTimer($instance->getIndex());
 };
 
 $notorm->debugTimer = function () {
-	$instance = NotOrmTracyPanel::getInstance();
+    $instance = NotOrmTracyPanel::getInstance();
     $instance->stopQueryTimer($instance->getIndex());
 };
 ```
@@ -73,12 +73,15 @@ Result?
 
 Changelog
 ---------
-v1.0.0 (2015-01-13)
-- initial release
+v2.0.0 (2020-10-04)
+- Big thanks to [@janbarasek](https://github.com/janbarasek)! Amazing job! :heart:
+- Big package upgrade - PHPStan, PHP 7.1+, Nette 3, Tests and so on!
 
 v1.0.1 (2017-01-30)
 - Add new versions of packages
 
+v1.0.0 (2015-01-13)
+- initial release
 -----
 
-(c) Martin Zeman (Zemistr), 2015 (http://zemistr.eu)
+(c) Martin Zeman (Zemistr), 2020 (http://zemistr.eu)
