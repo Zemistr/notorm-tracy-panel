@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 
-use Nette\Utils\Strings;
 use Tracy\Debugger;
 use Tracy\IBarPanel;
 use Yep\Reflection\ReflectionClass;
+use Zemistr\NotOrmTracy\Helpers;
 
 class NotOrmTracyPanel implements IBarPanel
 {
@@ -70,53 +70,6 @@ class NotOrmTracyPanel implements IBarPanel
 		$self->setPlatform($pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
 
 		Debugger::getBar()->addPanel($self);
-	}
-
-
-	public static function dump(string $sql): string
-	{
-		$keywords1 = 'CREATE\s+TABLE|CREATE(?:\s+UNIQUE)?\s+INDEX|SELECT|UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
-		$keywords2 = 'ALL|DISTINCT|DISTINCTROW|AS|USING|ON|AND|OR|IN|IS|NOT|NULL|LIKE|TRUE|FALSE|INTEGER|CLOB|VARCHAR|DATETIME|TIME|DATE|INT|SMALLINT|BIGINT|BOOL|BOOLEAN|DECIMAL|FLOAT|TEXT|VARCHAR|DEFAULT|AUTOINCREMENT|PRIMARY\s+KEY';
-
-		// insert new lines
-		$sql = " $sql ";
-		$sql = Strings::replace($sql, "#(?<=[\\s,(])($keywords1)(?=[\\s,)])#", "\n\$1");
-		if (strpos($sql, 'CREATE TABLE') !== false) {
-			$sql = Strings::replace($sql, '#,\s+#i', ", \n");
-		}
-
-		// reduce spaces
-		$sql = Strings::replace($sql, '#[ \t]{2,}#', ' ');
-
-		$sql = wordwrap($sql, 100);
-		$sql = htmlspecialchars($sql);
-		$sql = Strings::replace($sql, "#([ \t]*\r?\n){2,}#", "\n");
-		$sql = Strings::replace($sql, '#VARCHAR\\(#', 'VARCHAR (');
-
-		// syntax highlight
-		$sql = Strings::replace(
-			$sql,
-			"#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#s",
-			static function (array $matches): string {
-				if (!empty($matches[1])) { // comment
-					return '<em style="color:gray">' . $matches[1] . '</em>';
-				}
-				if (!empty($matches[2])) { // error
-					return '<strong style="color:red">' . $matches[2] . '</strong>';
-				}
-				if (!empty($matches[3])) { // most important keywords
-					return '<strong style="color:blue">' . $matches[3] . '</strong>';
-				}
-				if (!empty($matches[4])) { // other keywords
-					return '<strong style="color:green">' . $matches[4] . '</strong>';
-				}
-
-				return ''; // parse error
-			}
-		);
-		$sql = trim($sql);
-
-		return '<pre class="dump">' . $sql . '</pre>' . "\n";
 	}
 
 
@@ -229,7 +182,7 @@ class NotOrmTracyPanel implements IBarPanel
 				}
 
 				$s .= '</td>';
-				$s .= '<td class="notorm-sql">' . self::dump($sql);
+				$s .= '<td class="notorm-sql">' . Helpers::sqlHighlight($sql);
 
 				if ($explain) {
 					$s .= "<table id='notorm-tracy-DbConnectionPanel-row-$counter' class='tracy-collapsed'><tr>";
