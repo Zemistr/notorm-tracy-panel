@@ -74,7 +74,7 @@ Result?
 Changelog
 ---------
 v2.0.0 (2020-10-04)
-- Big thanks to @janbarasek! Amazing job! :hearth:
+- Big thanks to [@janbarasek](https://github.com/janbarasek)! Amazing job! :heart:
 - Big package upgrade - PHPStan, PHP 7.1+, Nette 3, Tests and so on!
 
 v1.0.1 (2017-01-30)
