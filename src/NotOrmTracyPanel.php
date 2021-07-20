@@ -6,7 +6,6 @@ declare(strict_types=1);
 use Nette\Utils\Strings;
 use Tracy\Debugger;
 use Tracy\IBarPanel;
-use Yep\Reflection\ReflectionClass;
 
 class NotOrmTracyPanel implements IBarPanel
 {
@@ -51,21 +50,24 @@ class NotOrmTracyPanel implements IBarPanel
 			$self->setPdo($pdo);
 		}
 
-		$notOrmReflection = ReflectionClass::from($notOrm);
-		$notOrmReflection->setPropertyValue(
-			'debug',
-			static function ($query, $parameters) use ($self): void {
+		try {
+			$reflection = new \ReflectionClass($notOrm);
+
+			$debug = $reflection->getProperty('debug');
+			$debug->setAccessible(true);
+			$debug->setValue($notOrm, static function ($query, $parameters) use ($self): void {
 				$self->logQuery($query, $parameters);
 				$self->startQueryTimer($self->getIndex());
-			}
-		);
+			});
 
-		$notOrmReflection->setPropertyValue(
-			'debugTimer',
-			static function () use ($self): void {
+			$debugTimer = $reflection->getProperty('debugTimer');
+			$debugTimer->setAccessible(true);
+			$debugTimer->setValue($notOrm, static function () use ($self): void {
 				$self->stopQueryTimer($self->getIndex());
-			}
-		);
+			});
+		} catch (\ReflectionException $e) {
+			throw new \RuntimeException('Can not reflect NotORM class: ' . $e->getMessage(), $e->getCode(), $e);
+		}
 
 		$self->setPlatform($pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
 
@@ -139,7 +141,14 @@ class NotOrmTracyPanel implements IBarPanel
 	public function getPdo(): \PDO
 	{
 		if ($this->pdo === null) {
-			$this->pdo = ReflectionClass::from($this->getNotOrm())->getPropertyValue('connection');
+			try {
+				$reflection = new \ReflectionClass($notOrm = $this->getNotOrm());
+				$connection = $reflection->getProperty('connection');
+				$connection->setAccessible(true);
+				$this->pdo = $connection->getValue($notOrm);
+			} catch (\ReflectionException $e) {
+				throw new \RuntimeException('Can not reflect NotORM class: ' . $e->getMessage(), $e->getCode(), $e);
+			}
 		}
 
 		return $this->pdo;
