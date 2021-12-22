@@ -19,13 +19,12 @@
 		"php": ">=7.1.0",
 		"vrana/notorm": "dev-master",
 		"nette/utils": "^3.0",
-		"tracy/tracy": "^2.6",
-		"yep/reflection": "^2.0"
+		"tracy/tracy": "^2.6"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^0.12.18",
 		"phpstan/phpstan-nette": "^0.12.6",
-		"symplify/easy-coding-standard": "^7.2"
+		"symplify/easy-coding-standard": "^10.0"
 	},
 	"autoload": {
 		"classmap": [
